@@ -289,6 +289,9 @@ describe("useQuickOpen", () => {
 
       const { selectPrevious, selectedIndex } = useQuickOpen();
 
+      // Verify initial state
+      expect(selectedIndex.value).toBe(0);
+
       selectPrevious();
       expect(selectedIndex.value).toBe(0);
     });
