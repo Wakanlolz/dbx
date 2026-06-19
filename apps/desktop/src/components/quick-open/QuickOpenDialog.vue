@@ -91,6 +91,20 @@ function getTypeLabel(type: string): string {
       return t("common.database");
     case "table":
       return t("common.table");
+    case "view":
+      return t("common.view");
+    case "materialized_view":
+      return t("common.materializedView");
+    case "procedure":
+      return t("common.procedure");
+    case "function":
+      return t("common.function");
+    case "sequence":
+      return t("common.sequence");
+    case "package":
+      return t("common.package");
+    case "package-body":
+      return t("common.packageBody");
     default:
       return type;
   }

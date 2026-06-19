@@ -287,7 +287,7 @@ export function useQuickOpen() {
     // Sort by score and type (connections > databases > tables > other objects for equal scores)
     matched.sort((a, b) => {
       if (a.matchScore !== b.matchScore) {
-        return a.matchScore - b.matchScore;
+        return b.matchScore - a.matchScore; // Higher scores rank better
       }
 
       const typeOrder = {

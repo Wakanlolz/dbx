@@ -936,6 +936,7 @@ function onAiOpenExplainPlan(sql: string) {
 
 async function handleQuickOpenSelect(item: any) {
   const connectionStore = useConnectionStore();
+  const queryStore = useQueryStore();
   
   // For all types, set the active connection
   connectionStore.activeConnectionId = item.connectionId;
@@ -956,14 +957,43 @@ async function handleQuickOpenSelect(item: any) {
     // For database, we could expand the tree node or show the database
     // For now, just select the connection
     return;
-  } else if (item.type === "table") {
-    // Open the table in a data tab
+  } else if (item.type === "table" || item.type === "view" || item.type === "materialized_view") {
+    // Open the table/view in a data tab
     await openTableTarget({
       connectionId: item.connectionId,
       database: item.database,
       schema: item.schema,
-      tableName: item.tableName,
+      tableName: item.objectName || item.tableName,
     });
+  } else if (item.type === "procedure" || item.type === "function" || item.type === "sequence" || item.type === "package" || item.type === "package-body") {
+    // Open the object source in a source tab
+    const objectTypeMap: Record<string, string> = {
+      procedure: "PROCEDURE",
+      function: "FUNCTION",
+      sequence: "SEQUENCE",
+      package: "PACKAGE",
+      "package-body": "PACKAGE_BODY",
+    };
+    
+    const objectType = objectTypeMap[item.type];
+    if (!objectType) return;
+    
+    const schema = item.schema || item.database;
+    try {
+      const result = await api.getObjectSource(item.connectionId, item.database, schema, item.objectName || item.tableName, objectType as any);
+      const tabId = queryStore.createTab(item.connectionId, item.database, `Source - ${item.objectName || item.tableName}`);
+      queryStore.updateSql(tabId, result.source);
+      if (item.type !== "sequence") {
+        queryStore.setObjectSource(tabId, {
+          schema,
+          name: item.objectName || item.tableName,
+          objectType,
+        });
+      }
+      queryStore.markTabClean(queryStore.tabs.find((tab) => tab.id === tabId));
+    } catch (error) {
+      toast((error as any)?.message || String(error), 5000);
+    }
   }
 }
 
