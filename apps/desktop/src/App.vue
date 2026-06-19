@@ -66,7 +66,8 @@ import { buildHistoryAiAnalysisPrompt } from "@/lib/historyAiAnalysis";
 import { countAvailableAgentDriverUpdates, type AgentDriverUpdateBadgeState } from "@/lib/agentDriverUpdateBadge";
 import { safeLocalStorageGet, safeLocalStorageSet } from "@/lib/safeStorage";
 import { rankSavedSqlHistory } from "@/lib/savedSqlHistory";
-import { isSchemaAware, isSingleDatabase } from "@/lib/databaseFeatureSupport";
+import { isSchemaAware, isSingleDatabase, usesTreeSchemaMode } from "@/lib/databaseFeatureSupport";
+import { connectionUsesDatabaseObjectTreeMode, effectiveDatabaseTypeForConnection } from "@/lib/jdbcDialect";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -951,11 +952,62 @@ async function handleQuickOpenSelect(item: any) {
   
   // Navigate based on type
   if (item.type === "connection") {
-    // Just switching the connection, no additional action needed
+    // Expand connection node in sidebar
+    const connNode = findTreeNodeById(connectionStore.treeNodes, item.id);
+    if (connNode && !connNode.isExpanded) {
+      const config = connectionStore.getConfig(item.connectionId);
+      if (config?.db_type === "redis") {
+        await connectionStore.loadRedisDatabases(item.connectionId);
+      } else if (config?.db_type === "etcd") {
+        await connectionStore.loadEtcdRoot(item.connectionId);
+      } else if (config?.db_type === "mongodb") {
+        await connectionStore.loadMongoDatabases(item.connectionId);
+      } else if (config?.db_type === "elasticsearch") {
+        await connectionStore.loadElasticsearchIndices(item.connectionId);
+      } else if (config?.db_type === "qdrant" || config?.db_type === "milvus") {
+        await connectionStore.loadVectorCollections(item.connectionId);
+      } else if (config?.db_type === "mq") {
+        await connectionStore.loadMqTenants(item.connectionId);
+      } else {
+        await connectionStore.loadDatabases(item.connectionId);
+      }
+    }
     return;
   } else if (item.type === "database") {
-    // For database, we could expand the tree node or show the database
-    // For now, just select the connection
+    // Expand connection node first
+    const connNode = findTreeNodeById(connectionStore.treeNodes, `conn-${item.connectionId}`);
+    if (connNode && !connNode.isExpanded) {
+      const config = connectionStore.getConfig(item.connectionId);
+      if (config?.db_type === "redis") {
+        await connectionStore.loadRedisDatabases(item.connectionId);
+      } else if (config?.db_type === "etcd") {
+        await connectionStore.loadEtcdRoot(item.connectionId);
+      } else if (config?.db_type === "mongodb") {
+        await connectionStore.loadMongoDatabases(item.connectionId);
+      } else if (config?.db_type === "elasticsearch") {
+        await connectionStore.loadElasticsearchIndices(item.connectionId);
+      } else if (config?.db_type === "qdrant" || config?.db_type === "milvus") {
+        await connectionStore.loadVectorCollections(item.connectionId);
+      } else if (config?.db_type === "mq") {
+        await connectionStore.loadMqTenants(item.connectionId);
+      } else {
+        await connectionStore.loadDatabases(item.connectionId);
+      }
+    }
+    
+    // Expand database node
+    const dbNode = findTreeNodeById(connectionStore.treeNodes, item.id);
+    if (dbNode && !dbNode.isExpanded) {
+      const config = connectionStore.getConfig(item.connectionId);
+      const effectiveDbType = effectiveDatabaseTypeForConnection(config);
+      if (config?.db_type === "sqlserver") {
+        await connectionStore.loadSqlServerDatabaseObjects(item.connectionId, item.database);
+      } else if (usesTreeSchemaMode(effectiveDbType) && !connectionUsesDatabaseObjectTreeMode(config)) {
+        await connectionStore.loadSchemas(item.connectionId, item.database);
+      } else {
+        await connectionStore.loadTables(item.connectionId, item.database);
+      }
+    }
     return;
   } else if (item.type === "table" || item.type === "view" || item.type === "materialized_view") {
     // Open the table/view in a data tab
