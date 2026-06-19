@@ -4,13 +4,14 @@ import { useConnectionStore } from "@/stores/connectionStore";
 
 export interface QuickOpenItem {
   id: string;
-  type: "connection" | "database" | "table";
+  type: "connection" | "database" | "table" | "view" | "materialized_view" | "procedure" | "function" | "sequence" | "package" | "package-body";
   label: string;
   description?: string;
   connectionId: string;
   database?: string;
   schema?: string;
-  tableName?: string;
+  objectName?: string; // For non-table objects (views, procedures, functions, sequences, packages)
+  tableName?: string; // Kept for backward compatibility
   connectionName?: string;
   searchText: string; // Lowercase text for searching
 }
@@ -120,7 +121,7 @@ export function useQuickOpen() {
         });
       }
 
-      // Schema nodes - skip them but process their tables
+      // Schema nodes - skip them but process their children
       if (node.type === "schema" && node.children) {
         processDatabaseTreeNodes(node.children, conn, items);
         continue;
@@ -137,6 +138,118 @@ export function useQuickOpen() {
           database: node.database,
           schema: node.schema,
           tableName: node.label,
+          connectionName: conn.name,
+          searchText: `${conn.name} ${node.database} ${node.schema || ""} ${node.label}`,
+        });
+      }
+
+      // View nodes
+      if (node.type === "view" && node.database && node.label) {
+        items.push({
+          id: `view-${conn.id}-${node.database}-${node.schema || ""}-${node.label}`,
+          type: "view",
+          label: node.label,
+          description: `${conn.name} / ${node.database}${node.schema ? " / " + node.schema : ""}`,
+          connectionId: conn.id,
+          database: node.database,
+          schema: node.schema,
+          objectName: node.label,
+          connectionName: conn.name,
+          searchText: `${conn.name} ${node.database} ${node.schema || ""} ${node.label}`,
+        });
+      }
+
+      // Materialized view nodes
+      if (node.type === "materialized_view" && node.database && node.label) {
+        items.push({
+          id: `mview-${conn.id}-${node.database}-${node.schema || ""}-${node.label}`,
+          type: "materialized_view",
+          label: node.label,
+          description: `${conn.name} / ${node.database}${node.schema ? " / " + node.schema : ""}`,
+          connectionId: conn.id,
+          database: node.database,
+          schema: node.schema,
+          objectName: node.label,
+          connectionName: conn.name,
+          searchText: `${conn.name} ${node.database} ${node.schema || ""} ${node.label}`,
+        });
+      }
+
+      // Procedure nodes
+      if (node.type === "procedure" && node.database && node.label) {
+        items.push({
+          id: `proc-${conn.id}-${node.database}-${node.schema || ""}-${node.label}`,
+          type: "procedure",
+          label: node.label,
+          description: `${conn.name} / ${node.database}${node.schema ? " / " + node.schema : ""}`,
+          connectionId: conn.id,
+          database: node.database,
+          schema: node.schema,
+          objectName: node.label,
+          connectionName: conn.name,
+          searchText: `${conn.name} ${node.database} ${node.schema || ""} ${node.label}`,
+        });
+      }
+
+      // Function nodes
+      if (node.type === "function" && node.database && node.label) {
+        items.push({
+          id: `func-${conn.id}-${node.database}-${node.schema || ""}-${node.label}`,
+          type: "function",
+          label: node.label,
+          description: `${conn.name} / ${node.database}${node.schema ? " / " + node.schema : ""}`,
+          connectionId: conn.id,
+          database: node.database,
+          schema: node.schema,
+          objectName: node.label,
+          connectionName: conn.name,
+          searchText: `${conn.name} ${node.database} ${node.schema || ""} ${node.label}`,
+        });
+      }
+
+      // Sequence nodes
+      if (node.type === "sequence" && node.database && node.label) {
+        items.push({
+          id: `seq-${conn.id}-${node.database}-${node.schema || ""}-${node.label}`,
+          type: "sequence",
+          label: node.label,
+          description: `${conn.name} / ${node.database}${node.schema ? " / " + node.schema : ""}`,
+          connectionId: conn.id,
+          database: node.database,
+          schema: node.schema,
+          objectName: node.label,
+          connectionName: conn.name,
+          searchText: `${conn.name} ${node.database} ${node.schema || ""} ${node.label}`,
+        });
+      }
+
+      // Package nodes
+      if (node.type === "package" && node.database && node.label) {
+        items.push({
+          id: `pkg-${conn.id}-${node.database}-${node.schema || ""}-${node.label}`,
+          type: "package",
+          label: node.label,
+          description: `${conn.name} / ${node.database}${node.schema ? " / " + node.schema : ""}`,
+          connectionId: conn.id,
+          database: node.database,
+          schema: node.schema,
+          objectName: node.label,
+          connectionName: conn.name,
+          searchText: `${conn.name} ${node.database} ${node.schema || ""} ${node.label}`,
+        });
+      }
+
+      // Package-body nodes
+      if (node.type === "package-body" && node.database && node.label) {
+        items.push({
+          id: `pkgbody-${conn.id}-${node.database}-${node.schema || ""}-${node.label}`,
+          type: "package-body",
+          label: node.label,
+          description: `${conn.name} / ${node.database}${node.schema ? " / " + node.schema : ""}`,
+          connectionId: conn.id,
+          database: node.database,
+          schema: node.schema,
+          objectName: node.label,
           connectionName: conn.name,
           searchText: `${conn.name} ${node.database} ${node.schema || ""} ${node.label}`,
         });
@@ -171,14 +284,25 @@ export function useQuickOpen() {
       }
     }
 
-    // Sort by score and type (connections > databases > tables for equal scores)
+    // Sort by score and type (connections > databases > tables > other objects for equal scores)
     matched.sort((a, b) => {
       if (a.matchScore !== b.matchScore) {
         return a.matchScore - b.matchScore;
       }
 
-      const typeOrder = { connection: 0, database: 1, table: 2 };
-      return typeOrder[a.type] - typeOrder[b.type];
+      const typeOrder = {
+        connection: 0,
+        database: 1,
+        table: 2,
+        view: 3,
+        materialized_view: 4,
+        procedure: 5,
+        function: 6,
+        sequence: 7,
+        package: 8,
+        "package-body": 9,
+      };
+      return (typeOrder[a.type] ?? 10) - (typeOrder[b.type] ?? 10);
     });
 
     return matched;
