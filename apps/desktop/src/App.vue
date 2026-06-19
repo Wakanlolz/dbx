@@ -953,7 +953,8 @@ async function handleQuickOpenSelect(item: any) {
   // Navigate based on type
   if (item.type === "connection") {
     // Expand connection node in sidebar
-    const connNode = findTreeNodeById(connectionStore.treeNodes, item.id);
+    // Tree node ID for connection is just the connectionId
+    const connNode = findTreeNodeById(connectionStore.treeNodes, item.connectionId);
     if (connNode && !connNode.isExpanded) {
       const config = connectionStore.getConfig(item.connectionId);
       if (config?.db_type === "redis") {
@@ -975,7 +976,8 @@ async function handleQuickOpenSelect(item: any) {
     return;
   } else if (item.type === "database") {
     // Expand connection node first
-    const connNode = findTreeNodeById(connectionStore.treeNodes, `conn-${item.connectionId}`);
+    // Tree node ID for connection is just the connectionId
+    const connNode = findTreeNodeById(connectionStore.treeNodes, item.connectionId);
     if (connNode && !connNode.isExpanded) {
       const config = connectionStore.getConfig(item.connectionId);
       if (config?.db_type === "redis") {
@@ -996,7 +998,9 @@ async function handleQuickOpenSelect(item: any) {
     }
     
     // Expand database node
-    const dbNode = findTreeNodeById(connectionStore.treeNodes, item.id);
+    // Tree node ID for database is `${connectionId}:${database_name}`
+    const dbNodeId = `${item.connectionId}:${item.database}`;
+    const dbNode = findTreeNodeById(connectionStore.treeNodes, dbNodeId);
     if (dbNode && !dbNode.isExpanded) {
       const config = connectionStore.getConfig(item.connectionId);
       const effectiveDbType = effectiveDatabaseTypeForConnection(config);
