@@ -51,6 +51,7 @@ import {
   isNewQueryShortcut,
   isObjectSourceSaveShortcutTarget,
   isOpenSettingsShortcut,
+  isQuickOpenShortcut,
   isResetZoomShortcut,
   isRefreshDataShortcut,
   isSaveShortcut,
@@ -79,6 +80,7 @@ const SqlLibraryPanel = defineAsyncComponent(() => import("@/components/layout/S
 const DriverStorePage = defineAsyncComponent(() => import("@/components/config/DriverStoreDialog.vue"));
 const UpdateDialog = defineAsyncComponent(() => import("@/components/layout/UpdateDialog.vue"));
 const LoginPage = defineAsyncComponent(() => import("@/components/auth/LoginPage.vue"));
+const QuickOpenDialog = defineAsyncComponent(() => import("@/components/quick-open/QuickOpenDialog.vue"));
 
 type AiAssistantHandle = {
   triggerAction: (action: AiAction, instruction?: string) => void;
@@ -105,6 +107,7 @@ const showConnectionDialog = ref(false);
 const connectionDialogPrefill = ref<ConnectionDeepLinkDraft | null>(null);
 const showSettingsDialog = ref(false);
 const showDriverStore = ref(false);
+const showQuickOpen = ref(false);
 const agentDriverUpdateCount = ref(0);
 const showHistory = ref(false);
 const showAiPanel = ref(safeLocalStorageGet("dbx-ai-panel-open") === "true");
@@ -931,6 +934,39 @@ function onAiOpenExplainPlan(sql: string) {
   });
 }
 
+async function handleQuickOpenSelect(item: any) {
+  const connectionStore = useConnectionStore();
+  
+  // For all types, set the active connection
+  connectionStore.activeConnectionId = item.connectionId;
+  
+  // Ensure connection is connected
+  try {
+    await connectionStore.ensureConnected(item.connectionId);
+  } catch (error) {
+    console.error("Failed to connect:", error);
+    return;
+  }
+  
+  // Navigate based on type
+  if (item.type === "connection") {
+    // Just switching the connection, no additional action needed
+    return;
+  } else if (item.type === "database") {
+    // For database, we could expand the tree node or show the database
+    // For now, just select the connection
+    return;
+  } else if (item.type === "table") {
+    // Open the table in a data tab
+    await openTableTarget({
+      connectionId: item.connectionId,
+      database: item.database,
+      schema: item.schema,
+      tableName: item.tableName,
+    });
+  }
+}
+
 function handleKeydown(e: KeyboardEvent) {
   if (e.defaultPrevented) return;
 
@@ -940,6 +976,12 @@ function handleKeydown(e: KeyboardEvent) {
     e.preventDefault();
     e.stopPropagation();
     showSettingsDialog.value = true;
+    return;
+  }
+  if (isQuickOpenShortcut(e, shortcuts)) {
+    e.preventDefault();
+    e.stopPropagation();
+    showQuickOpen.value = true;
     return;
   }
   if (isFocusSearchShortcut(e, shortcuts)) {
@@ -1405,6 +1447,7 @@ onUnmounted(() => {
           @download-and-install="downloadAndInstallUpdate"
           @restart="restartApp"
         />
+        <QuickOpenDialog :open="showQuickOpen" @update:open="showQuickOpen = $event" @select="handleQuickOpenSelect" />
       </div>
       <Teleport to="body">
         <Transition name="toast">
