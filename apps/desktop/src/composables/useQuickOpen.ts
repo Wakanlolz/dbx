@@ -69,6 +69,7 @@ export function useQuickOpen() {
   const allItems = computed((): QuickOpenItem[] => {
     const items: QuickOpenItem[] = [];
     const connections = connectionStore.connections;
+    const treeNodes = connectionStore.treeNodes;
 
     // Add connections
     for (const conn of connections) {
@@ -82,13 +83,14 @@ export function useQuickOpen() {
       });
     }
 
-    // Add databases and tables
+    // Add databases and tables from tree nodes
+    // Filter tree nodes by connection
     for (const conn of connections) {
-      const treeNodes = connectionStore.getTreeNodes(conn.id);
-      if (!treeNodes) continue;
+      const connectionTreeNodes = treeNodes.filter((node) => node.connectionId === conn.id);
+      if (connectionTreeNodes.length === 0) continue;
 
       // Process tree nodes to extract databases and tables
-      processDatabaseTreeNodes(treeNodes, conn, items);
+      processDatabaseTreeNodes(connectionTreeNodes, conn, items);
     }
 
     return items;
